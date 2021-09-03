@@ -49,7 +49,6 @@ const vertexSrc = `
   uniform mat4 uProjectionMatrix;
   uniform mat4 uViewMatrix;
   uniform mat4 uModelViewMatrix;
-  uniform mat4 uMatrix;
 
   varying mediump vec4 vColor;
 
@@ -64,7 +63,6 @@ const fragSrc = `
 
   void main() {
     // white color
-    //gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
     gl_FragColor = vColor;
   }
 `;
@@ -182,7 +180,7 @@ function getBuffersForScene(gl) {
   return buffers;
 }
 
-function generateModelMatrix(gl, programInfo, timestamp) {
+function generateModelMatrix(gl, programInfo, timestamp, objToDraw) {
   // NOTE: When using gl-matrix.js: [1, 1, 1] == [Y, X, Z]
   // model matrix (model to world space)
   const modelViewMatrix = mat4.create();
@@ -192,12 +190,14 @@ function generateModelMatrix(gl, programInfo, timestamp) {
   // to the world space's origin -- so spin the cube last
 
   // push the cube away from the camera
-  mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0, -10]);
+  mat4.translate(modelViewMatrix, modelViewMatrix, [objToDraw.translateY, objToDraw.translateX, objToDraw.translateZ]);
 
   // spin the cube
-  mat4.rotateX(modelViewMatrix, modelViewMatrix, timestamp * 0.002);
-  mat4.rotateY(modelViewMatrix, modelViewMatrix, timestamp * 0.002);
-  mat4.rotateZ(modelViewMatrix, modelViewMatrix, timestamp * 0.002);
+  mat4.rotateX(modelViewMatrix, modelViewMatrix, timestamp * objToDraw.rotateXSpeed * 0.002);
+  mat4.rotateY(modelViewMatrix, modelViewMatrix, timestamp * objToDraw.rotateYSpeed * 0.002);
+  mat4.rotateZ(modelViewMatrix, modelViewMatrix, timestamp * objToDraw.rotateZSpeed * 0.002);
+
+  mat4.scale(modelViewMatrix, modelViewMatrix, [2, 2, 2]);
 
   // pass it to the vertex shader
   gl.uniformMatrix4fv(
@@ -205,7 +205,6 @@ function generateModelMatrix(gl, programInfo, timestamp) {
     false,
     modelViewMatrix,
   );
-  programInfo.uniforms.uMatrix = modelViewMatrix;
 }
 
 function generateViewMatrix(gl, programInfo) {
@@ -245,40 +244,66 @@ function drawScene(gl, programInfo, timestamp) {
 
   gl.useProgram(programInfo.program);
 
-  // generate the matrixes to paint the scene
-  generateModelMatrix(gl, programInfo, timestamp);
-  generateViewMatrix(gl, programInfo);
-  generateProjectionMatrix(gl, programInfo);
+  programInfo.objectsToDraw.forEach((obj) => {
+    // generate the matrixes to paint the scene
+    generateModelMatrix(gl, programInfo, timestamp, obj);
+    generateViewMatrix(gl, programInfo);
+    generateProjectionMatrix(gl, programInfo);
 
-  // POSITION
-  // pull values out of the position buffer and feed them into the vertex shader
-  gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.buffers.positionBuffer);
-  gl.vertexAttribPointer(
-    programInfo.attributes.vertexPosition,
-    3, // triangles have 3 points
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
-  gl.enableVertexAttribArray(programInfo.attributes.vertexPosition);
+    // POSITION
+    // pull values out of the position buffer and feed them into the vertex shader
+    gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.buffers.positionBuffer);
+    gl.vertexAttribPointer(
+      programInfo.attributes.vertexPosition,
+      3, // triangles have 3 points
+      gl.FLOAT,
+      false,
+      0,
+      0,
+    );
+    gl.enableVertexAttribArray(programInfo.attributes.vertexPosition);
 
-  // COLOR
-  gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.buffers.colorBuffer);
-  gl.vertexAttribPointer(
-    programInfo.attributes.color,
-    4, // rgba
-    gl.UNSIGNED_BYTE,
-    false, // normalize
-    0,
-    0,
-  );
-  gl.enableVertexAttribArray(programInfo.attributes.color);
+    // COLOR
+    gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.buffers.colorBuffer);
+    gl.vertexAttribPointer(
+      programInfo.attributes.color,
+      4, // rgba
+      gl.UNSIGNED_BYTE,
+      false, // normalize
+      0,
+      0,
+    );
+    gl.enableVertexAttribArray(programInfo.attributes.color);
 
-  // paint the scene
-  gl.drawArrays(gl.TRIANGLES, 0, numOfVertices);
+    // paint the scene
+    gl.drawArrays(gl.TRIANGLES, 0, numOfVertices);
+  });
 }
 
+const numOfObjects = 3; // how many objects we want to render
+function getObjects() {
+  const objects = [];
+  for (let i = 0; i < numOfObjects; i++) {
+    const translateX = Math.random() * 10 - 5; // -5 to 5
+    const translateY = Math.random() * 10 - 5;
+    const translateZ = Math.random() * -50;
+    const rotateXSpeed = Math.random();
+    const rotateYSpeed = Math.random();
+    const rotateZSpeed = Math.random();
+
+    objects.push({
+      translateX,
+      translateY,
+      translateZ,
+      rotateXSpeed,
+      rotateYSpeed,
+      rotateZSpeed,
+    });
+  }
+  return objects;
+}
+
+let pendingAnimationRequest;
 function main() {
   // initialization
   const canvas = document.getElementById('tony-canvas');
@@ -292,45 +317,22 @@ function main() {
     },
     buffers: getBuffersForScene(gl),
     program,
-    uniforms: {
-      uMatrix: [],
-    },
+    objectsToDraw: getObjects(),
     uniformLocations: {
       modelViewMatrix: gl.getUniformLocation(program, 'uModelViewMatrix'),
       projectionMatrix: gl.getUniformLocation(program, 'uProjectionMatrix'),
-      uMatrix: gl.getUniformLocation(program, 'uMatrix'),
       viewMatrix: gl.getUniformLocation(program, 'uViewMatrix'),
     },
   };
 
   const drawFrame = (timestamp) => {
     drawScene(gl, programInfo, timestamp);
-    requestAnimationFrame(drawFrame);
+    pendingAnimationRequest = requestAnimationFrame(drawFrame);
   };
 
   // render whenever the browser says it's ok
-  requestAnimationFrame(drawFrame);
+  if (pendingAnimationRequest) {
+    cancelAnimationFrame(pendingAnimationRequest);
+  }
+  pendingAnimationRequest = requestAnimationFrame(drawFrame);
 }
-
-main();
-
-// how much to tilt the "camera" by in the WebGL scene
-let tiltFactorX = 0;
-let tiltFactorY = 0;
-
-// depending on the position of the cursor on the page, tilt the "camera" inside of the WebGL scene
-document.body.onmousemove = (ev) => {
-  const posX = ev.pageX;
-  const pageWidth = document.body.clientWidth;
-  const pageWidthHalfwayPoint = pageWidth / 2;
-  const cursorOffsetFromMiddleX = posX - pageWidthHalfwayPoint;
-  // scale the value down to 0 - 1 range
-  tiltFactorX = cursorOffsetFromMiddleX / pageWidthHalfwayPoint;
-
-  const posY = ev.pageY;
-  const pageHeight = document.body.clientHeight;
-  const pageHeightHalfwayPoint = pageHeight / 2;
-  const cursorOffsetFromMiddleY = posY - pageHeightHalfwayPoint;
-  // scale the value down to 0 - 1 range
-  tiltFactorY = cursorOffsetFromMiddleY / pageHeightHalfwayPoint;
-};
