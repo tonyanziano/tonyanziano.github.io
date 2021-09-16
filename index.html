@@ -4,12 +4,8 @@
     <title>The Website of Tony Anziano</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
-    integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
-    crossorigin="anonymous" defer></script> -->
 
-    <!-- <script src="./js/site.js" defer></script> -->
+    <script src="./js/site.js" defer></script>
 
     <!-- Favicon -->
     <link rel="icon" href="./media/favicon.ico" type="image/x-icon" />
@@ -21,9 +17,12 @@
       href="./css/tonyanziano.com.css"
     />
   </head>
-  <body>
+  <body class="light">
     <header class="main-header">
       <h1 class="title">TonyAnziano.com</h1>
+      <div class="toggle-button-track header-toggle">
+        <button id="theme-toggle" class="toggle-button-nub"><img id="theme-toggle-icon" src="media/light-theme-icon.svg" /></button>
+      </div>
     </header>
     <main class="content">
       <section>
